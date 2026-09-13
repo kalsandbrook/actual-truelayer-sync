@@ -2,6 +2,8 @@
 
 Syncs bank and credit card transactions from [TrueLayer](https://truelayer.com/) into [Actual Budget](https://actualbudget.org/). Runs as a scheduled Docker container.
 
+Pending transactions are imported as uncleared and are automatically reconciled by Actual once the settled version arrives (matched by amount and date), so they don't need to be handled specially.
+
 **Supported banks:** Any UK bank supported by TrueLayer's Open Banking or OAuth connections (Monzo, Starling, Barclays, HSBC, Lloyds, NatWest, Santander, and many more).
 
 ---

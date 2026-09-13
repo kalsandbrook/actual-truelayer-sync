@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Account, Connection } from '../config/schema'
 import type { TrueLayerAccount, TrueLayerCard, TrueLayerTransaction } from '../truelayer/types'
+import type { ActualTransaction } from '../transform/transform'
 import * as actual from '../actual/actual'
 import * as truelayer from '../truelayer/truelayer'
 import { syncAccount } from './account'
@@ -53,7 +54,11 @@ const baseOptions = {
 }
 
 describe('syncAccount', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(truelayer.getAccountPendingTransactions).mockResolvedValue([])
+    vi.mocked(truelayer.getCardPendingTransactions).mockResolvedValue([])
+  })
 
   it('fetches account transactions and imports them', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
@@ -62,17 +67,48 @@ describe('syncAccount', () => {
     await syncAccount({ ...baseOptions, configAccount: baseAccount })
 
     expect(truelayer.getAccountTransactions).toHaveBeenCalledWith('access-token', 'acc-1', undefined)
+    expect(truelayer.getAccountPendingTransactions).toHaveBeenCalledWith('access-token', 'acc-1')
     expect(actual.importTransactions).toHaveBeenCalledWith('actual-acc-1', expect.any(Array))
   })
 
-  it('calls getCardTransactions when resolveIsCard returns true', async () => {
+  it('calls getCardTransactions and getCardPendingTransactions when resolveIsCard returns true', async () => {
     vi.mocked(truelayer.getCardTransactions).mockResolvedValueOnce([mockTransaction])
     vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-1'], updated: [] })
 
     await syncAccount({ ...baseOptions, configAccount: { ...baseAccount, isCard: true } })
 
     expect(truelayer.getCardTransactions).toHaveBeenCalledWith('access-token', 'acc-1', undefined)
+    expect(truelayer.getCardPendingTransactions).toHaveBeenCalledWith('access-token', 'acc-1')
     expect(truelayer.getAccountTransactions).not.toHaveBeenCalled()
+    expect(truelayer.getAccountPendingTransactions).not.toHaveBeenCalled()
+  })
+
+  it('includes pending transactions as uncleared alongside settled ones', async () => {
+    const pendingTransaction = { ...mockTransaction, transaction_id: 'txn-pending-1' }
+    vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
+    vi.mocked(truelayer.getAccountPendingTransactions).mockResolvedValueOnce([pendingTransaction])
+    vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-1', 'txn-pending-1'], updated: [] })
+
+    await syncAccount({ ...baseOptions, configAccount: baseAccount })
+
+    const [, imported] = vi.mocked(actual.importTransactions).mock.calls[0] as [string, ActualTransaction[]]
+    expect(imported).toHaveLength(2)
+    expect(imported.find((t) => t.imported_id === 'txn-1')?.cleared).toBe(true)
+    expect(imported.find((t) => t.imported_id === 'txn-pending-1')?.cleared).toBe(false)
+  })
+
+  it('imports pending transactions even when there are no settled transactions', async () => {
+    const pendingTransaction = { ...mockTransaction, transaction_id: 'txn-pending-1' }
+    vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([])
+    vi.mocked(truelayer.getAccountPendingTransactions).mockResolvedValueOnce([pendingTransaction])
+    vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-pending-1'], updated: [] })
+
+    const result = await syncAccount({ ...baseOptions, configAccount: baseAccount })
+
+    expect(result).toBe(true)
+    expect(actual.importTransactions).toHaveBeenCalledWith('actual-acc-1', [
+      expect.objectContaining({ imported_id: 'txn-pending-1', cleared: false }),
+    ])
   })
 
   it('passes fromDate when lastSyncDate is provided', async () => {

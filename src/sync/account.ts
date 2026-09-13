@@ -1,5 +1,10 @@
 import { importTransactions } from '../actual/actual'
-import { getAccountTransactions, getCardTransactions } from '../truelayer/truelayer'
+import {
+  getAccountTransactions,
+  getCardTransactions,
+  getAccountPendingTransactions,
+  getCardPendingTransactions,
+} from '../truelayer/truelayer'
 import { transformTransactions } from '../transform/transform'
 import { computeFromDate } from '../utils/date'
 import { resolveIsCard } from '../utils/account'
@@ -35,31 +40,43 @@ export async function syncAccount({
   log(prefix, `Fetching transactions${fromDate ? ` since ${fromDate}` : ''}...`)
 
   let trueLayerTransactions: TrueLayerTransaction[]
+  let pendingTrueLayerTransactions: TrueLayerTransaction[]
   try {
     const isCard = resolveIsCard(configAccount, connection)
-    trueLayerTransactions = isCard
-      ? await getCardTransactions(accessToken, configAccount.trueLayerId, fromDate)
-      : await getAccountTransactions(accessToken, configAccount.trueLayerId, fromDate)
+    ;[trueLayerTransactions, pendingTrueLayerTransactions] = isCard
+      ? await Promise.all([
+          getCardTransactions(accessToken, configAccount.trueLayerId, fromDate),
+          getCardPendingTransactions(accessToken, configAccount.trueLayerId),
+        ])
+      : await Promise.all([
+          getAccountTransactions(accessToken, configAccount.trueLayerId, fromDate),
+          getAccountPendingTransactions(accessToken, configAccount.trueLayerId),
+        ])
   } catch (err) {
     logError(prefix, 'Failed to fetch transactions:', err)
     return false
   }
 
   const trueLayerAccount = trueLayerAccountsById.get(configAccount.trueLayerId)
-  const transactions = transformTransactions(
-    trueLayerTransactions,
-    configAccount,
-    trueLayerAccount,
-    includeCategoryInNotes,
-  )
+  const transactions = [
+    ...transformTransactions(trueLayerTransactions, configAccount, trueLayerAccount, includeCategoryInNotes),
+    ...transformTransactions(
+      pendingTrueLayerTransactions,
+      configAccount,
+      trueLayerAccount,
+      includeCategoryInNotes,
+      true,
+    ),
+  ]
 
   if (transactions.length === 0) {
     log(prefix, '└ No transactions.')
     return false
   }
 
-  log(prefix, `└ Found ${transactions.length} transactions.`)
-  const dates = trueLayerTransactions.map((t) => t.timestamp).sort()
+  const pendingSuffix = pendingTrueLayerTransactions.length > 0 ? ` (${pendingTrueLayerTransactions.length} pending)` : ''
+  log(prefix, `└ Found ${transactions.length} transactions${pendingSuffix}.`)
+  const dates = [...trueLayerTransactions, ...pendingTrueLayerTransactions].map((t) => t.timestamp).sort()
   const from = dates[0].slice(0, 10)
   const to = dates[dates.length - 1].slice(0, 10)
 

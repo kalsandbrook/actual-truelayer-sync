@@ -38,6 +38,7 @@ export function transformTransaction(
   configAccount: Account,
   trueLayerAccount: TrueLayerAccount | TrueLayerCard | undefined,
   includeCategoryInNotes: boolean,
+  pending = false,
 ): ActualTransaction {
   return {
     account: configAccount.actualId,
@@ -49,7 +50,7 @@ export function transformTransaction(
       includeCategoryInNotes && trueLayerTransaction.transaction_category !== 'UNKNOWN'
         ? trueLayerTransaction.transaction_category
         : undefined,
-    cleared: true,
+    cleared: !pending,
   }
 }
 
@@ -58,8 +59,9 @@ export function transformTransactions(
   configAccount: Account,
   trueLayerAccount: TrueLayerAccount | TrueLayerCard | undefined,
   includeCategoryInNotes: boolean,
+  pending = false,
 ): ActualTransaction[] {
   return trueLayerTransactions.map((t) =>
-    transformTransaction(t, configAccount, trueLayerAccount, includeCategoryInNotes),
+    transformTransaction(t, configAccount, trueLayerAccount, includeCategoryInNotes, pending),
   )
 }

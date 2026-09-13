@@ -159,6 +159,21 @@ describe('transformTransaction', () => {
     const result = transformTransaction(baseTransaction, { ...baseAccount, flip: false }, trueLayerCreditCard, false)
     expect(result.amount).toBe(350)
   })
+
+  it('defaults cleared to true when pending is not provided', () => {
+    const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false)
+    expect(result.cleared).toBe(true)
+  })
+
+  it('sets cleared to false when pending is true', () => {
+    const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false, true)
+    expect(result.cleared).toBe(false)
+  })
+
+  it('sets cleared to true when pending is explicitly false', () => {
+    const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false, false)
+    expect(result.cleared).toBe(true)
+  })
 })
 
 describe('transformTransactions', () => {
@@ -181,5 +196,12 @@ describe('transformTransactions', () => {
   it('passes includeCategoryInNotes to each transaction', () => {
     const result = transformTransactions([baseTransaction], baseAccount, trueLayerAccount, true)
     expect(result[0].notes).toBe('PURCHASE')
+  })
+
+  it('sets cleared to false for every transaction when pending is true', () => {
+    const transactions = [baseTransaction, { ...baseTransaction, transaction_id: 'txn-2' }]
+    const result = transformTransactions(transactions, baseAccount, trueLayerAccount, false, true)
+    expect(result[0].cleared).toBe(false)
+    expect(result[1].cleared).toBe(false)
   })
 })

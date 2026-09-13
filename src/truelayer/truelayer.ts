@@ -107,3 +107,24 @@ export async function getCardTransactions(
   })
   return res.data.results
 }
+
+export async function getAccountPendingTransactions(
+  accessToken: string,
+  accountId: string,
+): Promise<TrueLayerTransaction[]> {
+  const res = await axios.get<{ results: TrueLayerTransaction[] }>(
+    `${BASE_URL}/accounts/${accountId}/transactions/pending`,
+    { headers: { Authorization: `Bearer ${accessToken}`, timeout: NETWORK_TIMEOUT } },
+  )
+  return res.data.results
+}
+
+export async function getCardPendingTransactions(
+  accessToken: string,
+  cardId: string,
+): Promise<TrueLayerTransaction[]> {
+  const res = await axios.get<{ results: TrueLayerTransaction[] }>(`${BASE_URL}/cards/${cardId}/transactions/pending`, {
+    headers: { Authorization: `Bearer ${accessToken}`, timeout: NETWORK_TIMEOUT },
+  })
+  return res.data.results
+}

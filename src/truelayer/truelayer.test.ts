@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
-import { refreshToken, listAccounts, listCards, getAccountTransactions, getCardTransactions } from './truelayer'
+import {
+  refreshToken,
+  listAccounts,
+  listCards,
+  getAccountTransactions,
+  getCardTransactions,
+  getAccountPendingTransactions,
+  getCardPendingTransactions,
+} from './truelayer'
 import type { TrueLayerAccount, TrueLayerCard, TrueLayerTransaction } from './types'
 
 vi.mock('axios')
@@ -186,5 +194,51 @@ describe('getCardTransactions', () => {
     mockedAxios.get.mockResolvedValueOnce({ data: { results: [] } })
     await getCardTransactions('token', 'card-1')
     expect(mockedAxios.get.mock.calls[0][0]).toContain('/cards/card-1/transactions')
+  })
+})
+
+describe('getAccountPendingTransactions', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns transactions array', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [mockTransaction] } })
+    const result = await getAccountPendingTransactions('token', 'acc-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].transaction_id).toBe('txn-1')
+  })
+
+  it('sends Bearer token in Authorization header', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [] } })
+    await getAccountPendingTransactions('my-token', 'acc-1')
+    expect(mockedAxios.get.mock.calls[0][1]?.headers?.Authorization).toBe('Bearer my-token')
+  })
+
+  it('calls the correct URL', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [] } })
+    await getAccountPendingTransactions('token', 'acc-1')
+    expect(mockedAxios.get.mock.calls[0][0]).toContain('/accounts/acc-1/transactions/pending')
+  })
+})
+
+describe('getCardPendingTransactions', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns transactions array', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [mockTransaction] } })
+    const result = await getCardPendingTransactions('token', 'card-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].transaction_id).toBe('txn-1')
+  })
+
+  it('sends Bearer token in Authorization header', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [] } })
+    await getCardPendingTransactions('my-token', 'card-1')
+    expect(mockedAxios.get.mock.calls[0][1]?.headers?.Authorization).toBe('Bearer my-token')
+  })
+
+  it('calls the correct URL', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { results: [] } })
+    await getCardPendingTransactions('token', 'card-1')
+    expect(mockedAxios.get.mock.calls[0][0]).toContain('/cards/card-1/transactions/pending')
   })
 })
