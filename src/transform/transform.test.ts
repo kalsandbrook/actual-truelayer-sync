@@ -174,6 +174,101 @@ describe('transformTransaction', () => {
     const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false, false)
     expect(result.cleared).toBe(true)
   })
+
+  it('prefers merchant_name over description when present', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, description: 'REF12345 PAYMENT', merchant_name: 'Coffee Shop Ltd' },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('Coffee Shop Ltd')
+  })
+
+  it('falls back to meta.provider_merchant_name when merchant_name is absent', () => {
+    const result = transformTransaction(
+      {
+        ...baseTransaction,
+        description: 'REF12345 PAYMENT',
+        meta: { provider_merchant_name: 'Coffee Shop Ltd' },
+      },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('Coffee Shop Ltd')
+  })
+
+  it('falls back to meta.counter_party_preferred_name when merchant fields are absent', () => {
+    const result = transformTransaction(
+      {
+        ...baseTransaction,
+        description: 'REF12345 PAYMENT',
+        meta: { counter_party_preferred_name: 'Jane Doe' },
+      },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('Jane Doe')
+  })
+
+  it('falls back to description when no merchant/counter-party fields are present', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, description: 'REF12345 PAYMENT' },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('REF12345 PAYMENT')
+  })
+
+  it('falls back to description when merchant fields are blank strings', () => {
+    const result = transformTransaction(
+      {
+        ...baseTransaction,
+        description: 'REF12345 PAYMENT',
+        merchant_name: '  ',
+        meta: { provider_merchant_name: '', counter_party_preferred_name: '   ' },
+      },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('REF12345 PAYMENT')
+  })
+
+  it('puts the original description in notes when merchant_name is used for the payee', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, description: 'REF12345 PAYMENT', merchant_name: 'Coffee Shop Ltd' },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('Coffee Shop Ltd')
+    expect(result.notes).toBe('REF12345 PAYMENT')
+  })
+
+  it('combines category and description in notes when both apply', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, description: 'REF12345 PAYMENT', merchant_name: 'Coffee Shop Ltd' },
+      baseAccount,
+      trueLayerAccount,
+      true,
+    )
+    expect(result.notes).toBe('PURCHASE | REF12345 PAYMENT')
+  })
+
+  it('does not duplicate the description in notes when payee_name equals the description', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, description: 'Coffee Shop' },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.payee_name).toBe('Coffee Shop')
+    expect(result.notes).toBeUndefined()
+  })
 })
 
 describe('transformTransactions', () => {
