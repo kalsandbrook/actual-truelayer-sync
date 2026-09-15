@@ -200,7 +200,7 @@ describe('syncAccount', () => {
         { ...mockTransaction, transaction_id: 'txn-settled-1' },
       ])
       vi.mocked(actual.getTransactions).mockResolvedValueOnce([
-        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false },
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false, date: '2026-04-20', amount: 350 },
       ])
       vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-settled-1'], updated: [] })
 
@@ -236,7 +236,7 @@ describe('syncAccount', () => {
         { ...mockTransaction, transaction_id: 'txn-settled-1' },
       ])
       vi.mocked(actual.getTransactions).mockResolvedValueOnce([
-        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: true },
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: true, date: '2026-04-20', amount: 350 },
       ])
       vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-settled-1'], updated: [] })
 
@@ -278,7 +278,7 @@ describe('syncAccount', () => {
     it('cleans up a stale placeholder even when nothing else is pending or settled this run', async () => {
       vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([])
       vi.mocked(actual.getTransactions).mockResolvedValueOnce([
-        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false },
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false, date: '2026-04-20', amount: 350 },
       ])
 
       const result = await syncAccount({

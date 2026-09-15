@@ -21,7 +21,17 @@ declare module '@actual-app/api' {
       accountId: string,
       startDate: string,
       endDate: string,
-    ): Promise<{ id: string; imported_id?: string; cleared: boolean }[]>
+    ): Promise<
+      {
+        id: string
+        date: string
+        amount: number
+        imported_id?: string
+        imported_payee?: string
+        notes?: string
+        cleared: boolean
+      }[]
+    >
     deleteTransaction(id: string): Promise<void>
     shutdown(): Promise<void>
   }

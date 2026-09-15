@@ -76,7 +76,7 @@ export function transformTransaction(
     date: trueLayerTransaction.timestamp.split('T')[0]!,
     amount: toActualAmount(trueLayerTransaction.amount, shouldFlipAmount(configAccount, trueLayerAccount)),
     payee_name: payeeName,
-    imported_id: trueLayerTransaction.normalised_provider_transaction_id ?? trueLayerTransaction.transaction_id,
+    imported_id: trueLayerTransaction.transaction_id,
     notes: noteParts.length > 0 ? noteParts.join(' | ') : undefined,
     cleared: !pending,
   }

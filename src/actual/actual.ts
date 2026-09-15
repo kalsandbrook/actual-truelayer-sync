@@ -32,11 +32,17 @@ export async function getAccounts(): Promise<Array<{ id: string; name: string; c
   return actual.getAccounts()
 }
 
-export async function getTransactions(
-  accountId: string,
-  startDate: string,
-  endDate: string,
-): Promise<{ id: string; imported_id?: string; cleared: boolean }[]> {
+export interface ActualTransactionRow {
+  id: string
+  date: string
+  amount: number
+  imported_id?: string
+  imported_payee?: string
+  notes?: string
+  cleared: boolean
+}
+
+export async function getTransactions(accountId: string, startDate: string, endDate: string): Promise<ActualTransactionRow[]> {
   return actual.getTransactions(accountId, startDate, endDate)
 }
 

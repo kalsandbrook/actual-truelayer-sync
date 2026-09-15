@@ -115,18 +115,16 @@ describe('transformTransaction', () => {
     expect(result.cleared).toBe(true)
   })
 
-  it('prefers normalised_provider_transaction_id over transaction_id when present', () => {
+  it('uses transaction_id as imported_id even when normalised_provider_transaction_id is present', () => {
+    // imported_id must stay derived from transaction_id only: it's already the id scheme
+    // used for every transaction previously imported into Actual, and switching sources
+    // would break strict-id matching against that historical data on the next sync.
     const result = transformTransaction(
       { ...baseTransaction, normalised_provider_transaction_id: 'txn-norm-1' },
       baseAccount,
       trueLayerAccount,
       false,
     )
-    expect(result.imported_id).toBe('txn-norm-1')
-  })
-
-  it('falls back to transaction_id when normalised_provider_transaction_id is absent', () => {
-    const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false)
     expect(result.imported_id).toBe('txn-1')
   })
 

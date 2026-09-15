@@ -19,9 +19,9 @@ describe('deleteStalePendingTransactions', () => {
 
   it('deletes only uncleared transactions matching a stale imported_id', async () => {
     vi.mocked(actual.getTransactions).mockResolvedValueOnce([
-      { id: 'row-1', imported_id: 'txn-a', cleared: false },
-      { id: 'row-2', imported_id: 'txn-b', cleared: true },
-      { id: 'row-3', imported_id: 'txn-c', cleared: false },
+      { id: 'row-1', imported_id: 'txn-a', cleared: false, date: '2026-04-20', amount: 350 },
+      { id: 'row-2', imported_id: 'txn-b', cleared: true, date: '2026-04-20', amount: 350 },
+      { id: 'row-3', imported_id: 'txn-c', cleared: false, date: '2026-04-20', amount: 350 },
     ])
 
     await deleteStalePendingTransactions(['Bank'], 'actual-acc-1', ['txn-a', 'txn-b'])
@@ -31,7 +31,7 @@ describe('deleteStalePendingTransactions', () => {
   })
 
   it('ignores transactions with no imported_id', async () => {
-    vi.mocked(actual.getTransactions).mockResolvedValueOnce([{ id: 'row-1', cleared: false }])
+    vi.mocked(actual.getTransactions).mockResolvedValueOnce([{ id: 'row-1', date: '2026-04-20', amount: 350, cleared: false }])
 
     await deleteStalePendingTransactions(['Bank'], 'actual-acc-1', ['txn-a'])
 
@@ -40,7 +40,7 @@ describe('deleteStalePendingTransactions', () => {
 
   it('does nothing when no existing transaction matches a stale id', async () => {
     vi.mocked(actual.getTransactions).mockResolvedValueOnce([
-      { id: 'row-1', imported_id: 'txn-other', cleared: false },
+      { id: 'row-1', imported_id: 'txn-other', cleared: false, date: '2026-04-20', amount: 350 },
     ])
 
     await deleteStalePendingTransactions(['Bank'], 'actual-acc-1', ['txn-a'])
