@@ -115,6 +115,21 @@ describe('transformTransaction', () => {
     expect(result.cleared).toBe(true)
   })
 
+  it('prefers normalised_provider_transaction_id over transaction_id when present', () => {
+    const result = transformTransaction(
+      { ...baseTransaction, normalised_provider_transaction_id: 'txn-norm-1' },
+      baseAccount,
+      trueLayerAccount,
+      false,
+    )
+    expect(result.imported_id).toBe('txn-norm-1')
+  })
+
+  it('falls back to transaction_id when normalised_provider_transaction_id is absent', () => {
+    const result = transformTransaction(baseTransaction, baseAccount, trueLayerAccount, false)
+    expect(result.imported_id).toBe('txn-1')
+  })
+
   it('strips time from timestamp to get date', () => {
     const result = transformTransaction(
       { ...baseTransaction, timestamp: '2026-01-15T23:59:59Z' },

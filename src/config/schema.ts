@@ -44,6 +44,7 @@ export const EnvSchema = z.object({
 
 export const AccountStateSchema = z.object({
   lastSyncDate: z.string().date().optional(),
+  pendingImportedIds: z.array(z.string()).default([]),
 })
 
 export const ConnectionStateSchema = z.object({

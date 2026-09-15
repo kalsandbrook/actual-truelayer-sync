@@ -10,6 +10,7 @@ import { computeFromDate } from '../utils/date'
 import { resolveIsCard } from '../utils/account'
 import { buildImportSummary } from '../utils/logging'
 import { log, logError } from '../utils/logger'
+import { deleteStalePendingTransactions } from './reconcile'
 import type { Account, Connection } from '../config/schema'
 import type { TrueLayerAccount, TrueLayerCard, TrueLayerTransaction } from '../truelayer/types'
 
@@ -21,7 +22,13 @@ interface SyncAccountOptions {
   includeCategoryInNotes: boolean
   lookbackDays: number
   lastSyncDate?: string
+  previousPendingImportedIds?: string[]
   dryRun?: boolean
+}
+
+export interface SyncAccountResult {
+  hadTransactions: boolean
+  pendingImportedIds: string[]
 }
 
 export async function syncAccount({
@@ -32,8 +39,9 @@ export async function syncAccount({
   includeCategoryInNotes,
   lookbackDays,
   lastSyncDate,
+  previousPendingImportedIds = [],
   dryRun = false,
-}: SyncAccountOptions): Promise<boolean> {
+}: SyncAccountOptions): Promise<SyncAccountResult> {
   const prefix = [connection.name, configAccount.friendlyName]
   const fromDate = lastSyncDate ? computeFromDate(lastSyncDate, lookbackDays) : undefined
 
@@ -54,7 +62,7 @@ export async function syncAccount({
         ])
   } catch (err) {
     logError(prefix, 'Failed to fetch transactions:', err)
-    return false
+    return { hadTransactions: false, pendingImportedIds: [] }
   }
 
   const trueLayerAccount = trueLayerAccountsById.get(configAccount.trueLayerId)
@@ -69,9 +77,27 @@ export async function syncAccount({
     ),
   ]
 
+  const pendingImportedIds = transactions.filter((t) => !t.cleared).map((t) => t.imported_id)
+
+  // A transaction that was pending last run but whose imported_id isn't present anywhere in
+  // this run's fetch has either settled under a different id (TrueLayer doesn't guarantee
+  // stable ids across the pending→settled transition for every provider) or been cancelled.
+  // Either way the old uncleared placeholder is stale and must be cleared out, or it'll sit
+  // alongside a freshly-imported duplicate forever.
+  const currentImportedIds = new Set(transactions.map((t) => t.imported_id))
+  const staleImportedIds = previousPendingImportedIds.filter((id) => !currentImportedIds.has(id))
+
+  if (!dryRun && staleImportedIds.length > 0) {
+    try {
+      await deleteStalePendingTransactions(prefix, configAccount.actualId, staleImportedIds)
+    } catch (err) {
+      logError(prefix, 'Failed to remove stale pending transactions:', err)
+    }
+  }
+
   if (transactions.length === 0) {
     log(prefix, '└ No transactions.')
-    return false
+    return { hadTransactions: false, pendingImportedIds }
   }
 
   const pendingSuffix = pendingTrueLayerTransactions.length > 0 ? ` (${pendingTrueLayerTransactions.length} pending)` : ''
@@ -82,7 +108,7 @@ export async function syncAccount({
 
   if (dryRun) {
     log(prefix, `└ [DRY RUN] Would import ${transactions.length} transactions (${from} → ${to}).`)
-    return false
+    return { hadTransactions: false, pendingImportedIds }
   }
 
   try {
@@ -90,8 +116,8 @@ export async function syncAccount({
     log(prefix, `└ ${buildImportSummary(result.added.length, result.updated.length)} (${from} → ${to}).`)
   } catch (err) {
     logError(prefix, 'Failed to import transactions:', err)
-    return false
+    return { hadTransactions: false, pendingImportedIds: [] }
   }
 
-  return true
+  return { hadTransactions: true, pendingImportedIds }
 }

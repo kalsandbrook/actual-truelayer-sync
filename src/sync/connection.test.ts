@@ -49,7 +49,7 @@ describe('syncConnection', () => {
       refresh_token: 'new-refresh',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     const result = await syncConnection(baseConnection, baseConfig)
 
@@ -62,7 +62,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     await syncConnection(baseConnection, baseConfig)
 
@@ -75,7 +75,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     await syncConnection(baseConnection, baseConfig)
 
@@ -99,7 +99,7 @@ describe('syncConnection', () => {
         connections: {
           'My Bank': {
             refreshToken: 'old-refresh-token',
-            accounts: { 'acc-1': { lastSyncDate: '2026-04-24' } },
+            accounts: { 'acc-1': { lastSyncDate: '2026-04-24', pendingImportedIds: [] } },
           },
         },
       },
@@ -109,7 +109,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     await syncConnection(baseConnection, configWithState)
 
@@ -124,7 +124,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(true)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: true, pendingImportedIds: [] })
 
     const result = await syncConnection(baseConnection, baseConfig)
 
@@ -137,7 +137,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     const result = await syncConnection(baseConnection, baseConfig)
 
@@ -196,7 +196,7 @@ describe('syncConnection', () => {
       refresh_token: 'old-refresh-token',
     })
     vi.mocked(accounts.fetchAccountMap).mockResolvedValueOnce(new Map())
-    vi.mocked(account.syncAccount).mockResolvedValueOnce(false)
+    vi.mocked(account.syncAccount).mockResolvedValueOnce({ hadTransactions: false, pendingImportedIds: [] })
 
     await syncConnection(baseConnection, baseConfig, true)
 

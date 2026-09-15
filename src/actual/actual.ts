@@ -32,6 +32,18 @@ export async function getAccounts(): Promise<Array<{ id: string; name: string; c
   return actual.getAccounts()
 }
 
+export async function getTransactions(
+  accountId: string,
+  startDate: string,
+  endDate: string,
+): Promise<{ id: string; imported_id?: string; cleared: boolean }[]> {
+  return actual.getTransactions(accountId, startDate, endDate)
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  await actual.deleteTransaction(id)
+}
+
 export async function shutdownActual(): Promise<void> {
   await actual.shutdown()
 }

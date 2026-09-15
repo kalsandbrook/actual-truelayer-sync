@@ -3,7 +3,7 @@ import { syncAccount } from './account'
 import { fetchAccountMap } from './accounts'
 import { currentDate } from '../utils/date'
 import { log, logError } from '../utils/logger'
-import { getConnectionState, getAccountLastSyncDate } from '../config/state'
+import { getConnectionState, getAccountLastSyncDate, getAccountPendingImportedIds } from '../config/state'
 import type { Connection, Config, ConnectionState } from '../config/schema'
 import type { TrueLayerAccount, TrueLayerCard } from '../truelayer/types'
 
@@ -56,7 +56,8 @@ export async function syncConnection(
   const updatedAccounts = { ...connectionState.accounts }
   for (const configAccount of connection.accounts) {
     const lastSyncDate = getAccountLastSyncDate(config.state, connection.name, configAccount.trueLayerId)
-    const hadTransactions = await syncAccount({
+    const previousPendingImportedIds = getAccountPendingImportedIds(config.state, connection.name, configAccount.trueLayerId)
+    const { hadTransactions, pendingImportedIds } = await syncAccount({
       configAccount,
       connection,
       accessToken,
@@ -64,11 +65,12 @@ export async function syncConnection(
       includeCategoryInNotes: config.includeCategoryInNotes,
       lookbackDays: config.lookbackDays,
       lastSyncDate,
+      previousPendingImportedIds,
       dryRun,
     })
 
     if (hadTransactions) {
-      updatedAccounts[configAccount.trueLayerId] = { lastSyncDate: currentDate() }
+      updatedAccounts[configAccount.trueLayerId] = { lastSyncDate: currentDate(), pendingImportedIds }
     }
   }
 

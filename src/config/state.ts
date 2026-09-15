@@ -7,3 +7,7 @@ export function getConnectionState(state: State, connectionName: string): Connec
 export function getAccountLastSyncDate(state: State, connectionName: string, trueLayerId: string): string | undefined {
   return state.connections[connectionName]?.accounts[trueLayerId]?.lastSyncDate
 }
+
+export function getAccountPendingImportedIds(state: State, connectionName: string, trueLayerId: string): string[] {
+  return state.connections[connectionName]?.accounts[trueLayerId]?.pendingImportedIds ?? []
+}

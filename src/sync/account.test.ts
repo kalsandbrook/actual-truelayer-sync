@@ -58,6 +58,7 @@ describe('syncAccount', () => {
     vi.clearAllMocks()
     vi.mocked(truelayer.getAccountPendingTransactions).mockResolvedValue([])
     vi.mocked(truelayer.getCardPendingTransactions).mockResolvedValue([])
+    vi.mocked(actual.getTransactions).mockResolvedValue([])
   })
 
   it('fetches account transactions and imports them', async () => {
@@ -105,7 +106,7 @@ describe('syncAccount', () => {
 
     const result = await syncAccount({ ...baseOptions, configAccount: baseAccount })
 
-    expect(result).toBe(true)
+    expect(result.hadTransactions).toBe(true)
     expect(actual.importTransactions).toHaveBeenCalledWith('actual-acc-1', [
       expect.objectContaining({ imported_id: 'txn-pending-1', cleared: false }),
     ])
@@ -128,16 +129,27 @@ describe('syncAccount', () => {
     expect(actual.importTransactions).not.toHaveBeenCalled()
   })
 
-  it('returns true after successful import', async () => {
+  it('returns hadTransactions: true after successful import', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
     vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-1'], updated: [] })
 
     const result = await syncAccount({ ...baseOptions, configAccount: baseAccount })
 
-    expect(result).toBe(true)
+    expect(result.hadTransactions).toBe(true)
   })
 
-  it('returns false when no transactions returned', async () => {
+  it('returns the current pending imported ids alongside hadTransactions', async () => {
+    const pendingTransaction = { ...mockTransaction, transaction_id: 'txn-pending-1' }
+    vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
+    vi.mocked(truelayer.getAccountPendingTransactions).mockResolvedValueOnce([pendingTransaction])
+    vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-1', 'txn-pending-1'], updated: [] })
+
+    const result = await syncAccount({ ...baseOptions, configAccount: baseAccount })
+
+    expect(result.pendingImportedIds).toEqual(['txn-pending-1'])
+  })
+
+  it('returns hadTransactions: false when no transactions returned', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([])
 
     const result = await syncAccount({
@@ -146,10 +158,10 @@ describe('syncAccount', () => {
       trueLayerAccountsById: emptyAccountsById,
     })
 
-    expect(result).toBe(false)
+    expect(result.hadTransactions).toBe(false)
   })
 
-  it('returns false when fetching transactions fails', async () => {
+  it('returns hadTransactions: false when fetching transactions fails', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockRejectedValueOnce(new Error('Network error'))
 
     const result = await syncAccount({
@@ -158,25 +170,126 @@ describe('syncAccount', () => {
       trueLayerAccountsById: emptyAccountsById,
     })
 
-    expect(result).toBe(false)
+    expect(result.hadTransactions).toBe(false)
     expect(actual.importTransactions).not.toHaveBeenCalled()
   })
 
-  it('returns false when importing transactions fails', async () => {
+  it('returns hadTransactions: false when importing transactions fails', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
     vi.mocked(actual.importTransactions).mockRejectedValueOnce(new Error('Import error'))
 
     const result = await syncAccount({ ...baseOptions, configAccount: baseAccount })
 
-    expect(result).toBe(false)
+    expect(result.hadTransactions).toBe(false)
   })
 
-  it('returns false and does not import when dryRun is true', async () => {
+  it('returns hadTransactions: false and does not import when dryRun is true', async () => {
     vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
 
     const result = await syncAccount({ ...baseOptions, configAccount: baseAccount, dryRun: true })
 
-    expect(result).toBe(false)
+    expect(result.hadTransactions).toBe(false)
     expect(actual.importTransactions).not.toHaveBeenCalled()
+  })
+
+  describe('stale pending reconciliation', () => {
+    it('deletes an uncleared placeholder whose imported_id has dropped out of the current fetch', async () => {
+      // Settled transaction now arrives under a different id than the one it was
+      // originally imported as pending under (e.g. TrueLayer/Starling reissuing ids).
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([
+        { ...mockTransaction, transaction_id: 'txn-settled-1' },
+      ])
+      vi.mocked(actual.getTransactions).mockResolvedValueOnce([
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false },
+      ])
+      vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-settled-1'], updated: [] })
+
+      await syncAccount({
+        ...baseOptions,
+        configAccount: baseAccount,
+        previousPendingImportedIds: ['txn-pending-1'],
+      })
+
+      expect(actual.deleteTransaction).toHaveBeenCalledWith('actual-row-1')
+    })
+
+    it('does not delete anything when the previously-pending id reappears in the current fetch', async () => {
+      // Provider gives a stable id across pending -> settled: strict imported_id matching
+      // in Actual already reconciles this cleanly, no cleanup needed.
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([
+        { ...mockTransaction, transaction_id: 'txn-pending-1' },
+      ])
+      vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: [], updated: ['txn-pending-1'] })
+
+      await syncAccount({
+        ...baseOptions,
+        configAccount: baseAccount,
+        previousPendingImportedIds: ['txn-pending-1'],
+      })
+
+      expect(actual.getTransactions).not.toHaveBeenCalled()
+      expect(actual.deleteTransaction).not.toHaveBeenCalled()
+    })
+
+    it('does not delete a cleared (already-settled) transaction even if its id matches', async () => {
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([
+        { ...mockTransaction, transaction_id: 'txn-settled-1' },
+      ])
+      vi.mocked(actual.getTransactions).mockResolvedValueOnce([
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: true },
+      ])
+      vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-settled-1'], updated: [] })
+
+      await syncAccount({
+        ...baseOptions,
+        configAccount: baseAccount,
+        previousPendingImportedIds: ['txn-pending-1'],
+      })
+
+      expect(actual.deleteTransaction).not.toHaveBeenCalled()
+    })
+
+    it('skips reconciliation entirely when there are no previously-pending ids', async () => {
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([mockTransaction])
+      vi.mocked(actual.importTransactions).mockResolvedValueOnce({ added: ['txn-1'], updated: [] })
+
+      await syncAccount({ ...baseOptions, configAccount: baseAccount, previousPendingImportedIds: [] })
+
+      expect(actual.getTransactions).not.toHaveBeenCalled()
+      expect(actual.deleteTransaction).not.toHaveBeenCalled()
+    })
+
+    it('does not delete anything during a dry run', async () => {
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([
+        { ...mockTransaction, transaction_id: 'txn-settled-1' },
+      ])
+
+      await syncAccount({
+        ...baseOptions,
+        configAccount: baseAccount,
+        previousPendingImportedIds: ['txn-pending-1'],
+        dryRun: true,
+      })
+
+      expect(actual.getTransactions).not.toHaveBeenCalled()
+      expect(actual.deleteTransaction).not.toHaveBeenCalled()
+    })
+
+    it('cleans up a stale placeholder even when nothing else is pending or settled this run', async () => {
+      vi.mocked(truelayer.getAccountTransactions).mockResolvedValueOnce([])
+      vi.mocked(actual.getTransactions).mockResolvedValueOnce([
+        { id: 'actual-row-1', imported_id: 'txn-pending-1', cleared: false },
+      ])
+
+      const result = await syncAccount({
+        ...baseOptions,
+        configAccount: baseAccount,
+        trueLayerAccountsById: emptyAccountsById,
+        previousPendingImportedIds: ['txn-pending-1'],
+      })
+
+      expect(actual.deleteTransaction).toHaveBeenCalledWith('actual-row-1')
+      expect(result.hadTransactions).toBe(false)
+    })
   })
 })
